@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bibliotheek - Beheer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <h1>Beheer</h1>
+    <div id="msg" class="msg"></div>
+
+    <form id="itemForm">
+      <strong id="formTitle">Item toevoegen</strong>
+      <label>Type
+        <select id="type"><option value="BOOK">Boek</option><option value="MAGAZINE">Tijdschrift</option></select>
+      </label>
+      <label>Titel <input id="title" required></label>
+      <label>Jaar <input id="year" type="number" required></label>
+      <label id="authorLabel">Auteur <input id="author"></label>
+      <label id="issueLabel" hidden>Nummer <input id="issueNumber" type="number"></label>
+      <div>
+        <button type="submit">Opslaan</button>
+        <button type="button" id="cancel" hidden>Annuleren</button>
+      </div>
+    </form>
+
+    <table>
+      <thead><tr><th>Titel</th><th>Type</th><th>Jaar</th><th>Auteur / Nummer</th><th>Status</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    const session = requireLogin('LIBRARIAN');
+    let editingId = null;
+    const $ = (id) => document.getElementById(id);
+
+    if (session) { renderNav('manage'); load(); }
+
+    function updateTypeFields() {
+      const isBook = $('type').value === 'BOOK';
+      $('authorLabel').hidden = !isBook;
+      $('issueLabel').hidden = isBook;
+    }
+    $('type').addEventListener('change', updateTypeFields);
+
+    function resetForm() {
+      editingId = null;
+      $('itemForm').reset();
+      $('type').disabled = false;
+      $('formTitle').textContent = 'Item toevoegen';
+      $('cancel').hidden = true;
+      updateTypeFields();
+    }
+    $('cancel').onclick = resetForm;
+
+    $('itemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        type: $('type').value,
+        title: $('title').value,
+        year: parseInt($('year').value, 10),
+        author: $('type').value === 'BOOK' ? $('author').value : null,
+        issueNumber: $('type').value === 'MAGAZINE' ? parseInt($('issueNumber').value, 10) : null
+      };
+      try {
+        if (editingId === null) await apiFetch('/items', { method: 'POST', body: JSON.stringify(body) });
+        else await apiFetch('/items/' + editingId, { method: 'PUT', body: JSON.stringify(body) });
+        showMessage('Opgeslagen', 'ok');
+        resetForm();
+      } catch (err) { showMessage(err.message, 'error'); }
+      load();
+    });
+
+    function edit(item) {
+      editingId = item.id;
+      $('type').value = item.type;
+      $('type').disabled = true;           // type wijzigen kan niet
+      $('title').value = item.title;
+      $('year').value = item.year;
+      $('author').value = item.author || '';
+      $('issueNumber').value = item.issueNumber || '';
+      $('formTitle').textContent = 'Item wijzigen';
+      $('cancel').hidden = false;
+      updateTypeFields();
+      window.scrollTo(0, 0);
+    }
+
+    async function remove(item) {
+      if (!confirm('"' + item.title + '" verwijderen?')) return;
+      try {
+        await apiFetch('/items/' + item.id, { method: 'DELETE' });
+        showMessage('Verwijderd', 'ok');
+      } catch (err) { showMessage(err.message, 'error'); }
+      load();
+    }
+
+    async function load() {
+      try {
+        const items = await apiFetch('/items');
+        const rows = $('rows');
+        rows.replaceChildren();
+        items.forEach((item) => {
+          const tr = el('tr');
+          tr.appendChild(el('td', item.title));
+          tr.appendChild(el('td', item.type === 'BOOK' ? 'Boek' : 'Tijdschrift'));
+          tr.appendChild(el('td', item.year));
+          tr.appendChild(el('td', item.type === 'BOOK' ? item.author : 'Nr. ' + item.issueNumber));
+          const status = el('td');
+          status.appendChild(el('span', item.available ? 'Beschikbaar' : 'Uitgeleend',
+                                'badge ' + (item.available ? 'free' : 'out')));
+          tr.appendChild(status);
+          const action = el('td');
+          const e = el('button', 'Wijzig', 'action'); e.onclick = () => edit(item);
+          const d = el('button', 'Verwijder', 'action danger'); d.onclick = () => remove(item);
+          action.append(e, ' ', d);
+          tr.appendChild(action);
+          rows.appendChild(tr);
+        });
+      } catch (err) { showMessage(err.message, 'error'); }
+    }
+  </script>
+</body>
+</html>

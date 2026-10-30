@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bibliotheek - Leningen</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <h1 id="title">Mijn leningen</h1>
+    <div id="msg" class="msg"></div>
+    <table>
+      <thead><tr><th>Item</th><th>Gebruiker</th><th>Geleend op</th><th>Teruggebracht op</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    const session = requireLogin();
+    if (session) {
+      renderNav('loans');
+      if (session.role === 'LIBRARIAN') document.getElementById('title').textContent = 'Alle leningen';
+      load();
+    }
+
+    async function load() {
+      try {
+        const loans = await apiFetch('/loans');
+        const rows = document.getElementById('rows');
+        rows.replaceChildren();
+        loans.forEach((loan) => {
+          const tr = el('tr');
+          tr.appendChild(el('td', loan.itemTitle));
+          tr.appendChild(el('td', loan.username));
+          tr.appendChild(el('td', loan.borrowedAt));
+          tr.appendChild(el('td', loan.returnedAt || '-'));
+          const action = el('td');
+          if (session.role === 'STUDENT' && !loan.returnedAt) {
+            const b = el('button', 'Terugbrengen', 'action');
+            b.onclick = () => giveBack(loan.id);
+            action.appendChild(b);
+          }
+          tr.appendChild(action);
+          rows.appendChild(tr);
+        });
+      } catch (err) { showMessage(err.message, 'error'); }
+    }
+
+    async function giveBack(id) {
+      try {
+        await apiFetch('/loans/' + id + '/return', { method: 'PUT' });
+        showMessage('Item teruggebracht', 'ok');
+      } catch (err) { showMessage(err.message, 'error'); }
+      load();
+    }
+  </script>
+</body>
+</html>

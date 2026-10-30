@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bibliotheek - Items</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <h1>Items</h1>
+    <div id="msg" class="msg"></div>
+    <table>
+      <thead><tr><th>Titel</th><th>Type</th><th>Jaar</th><th>Auteur / Nummer</th><th>Status</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    const session = requireLogin();
+    if (session) { renderNav('items'); load(); }
+
+    async function load() {
+      try {
+        const items = await apiFetch('/items');
+        const rows = document.getElementById('rows');
+        rows.replaceChildren();
+        items.forEach((item) => {
+          const tr = el('tr');
+          tr.appendChild(el('td', item.title));
+          tr.appendChild(el('td', item.type === 'BOOK' ? 'Boek' : 'Tijdschrift'));
+          tr.appendChild(el('td', item.year));
+          tr.appendChild(el('td', item.type === 'BOOK' ? item.author : 'Nr. ' + item.issueNumber));
+          const status = el('td');
+          status.appendChild(el('span', item.available ? 'Beschikbaar' : 'Uitgeleend',
+                                'badge ' + (item.available ? 'free' : 'out')));
+          tr.appendChild(status);
+          const action = el('td');
+          if (session.role === 'STUDENT') {
+            const b = el('button', 'Lenen', 'action');
+            b.disabled = !item.available;
+            b.onclick = () => borrow(item.id);
+            action.appendChild(b);
+          }
+          tr.appendChild(action);
+          rows.appendChild(tr);
+        });
+      } catch (err) { showMessage(err.message, 'error'); }
+    }
+
+    async function borrow(itemId) {
+      try {
+        await apiFetch('/loans', { method: 'POST', body: JSON.stringify({ itemId }) });
+        showMessage('Item geleend', 'ok');
+      } catch (err) { showMessage(err.message, 'error'); }
+      load();
+    }
+  </script>
+</body>
+</html>

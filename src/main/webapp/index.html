@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bibliotheek - Inloggen</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="login">
+    <h1>Bibliotheek</h1>
+    <div id="msg" class="msg"></div>
+    <form id="loginForm">
+      <label>Gebruikersnaam <input id="username" required autofocus></label>
+      <label>Wachtwoord <input id="password" type="password" required></label>
+      <button type="submit">Inloggen</button>
+    </form>
+    <p><small>Demo: student1 / student123 &middot; librarian1 / librarian123</small></p>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
+        });
+        sessionStorage.setItem('session', JSON.stringify(res));
+        location.href = res.role === 'LIBRARIAN' ? 'manage.html' : 'items.html';
+      } catch (err) {
+        showMessage(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>
